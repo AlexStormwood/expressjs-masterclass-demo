@@ -1,0 +1,22 @@
+{
+  "dependencies": {
+    "express": "^4.17.1",
+    "firebase": "^9.5.0",
+    "firebase-admin": "^10.0.0"
+  },
+  "name": "expressjs-masterclass-demo",
+  "description": "Example of what the ExpressJS masterclass server for Flex1 2021 can look like.",
+  "version": "1.0.0",
+  "main": "index.js",
+  "devDependencies": {
+    "nodemon": "^2.0.15"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
