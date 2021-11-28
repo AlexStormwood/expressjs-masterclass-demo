@@ -2,7 +2,8 @@
   "dependencies": {
     "express": "^4.17.1",
     "firebase": "^9.5.0",
-    "firebase-admin": "^10.0.0"
+    "firebase-admin": "^10.0.0",
+    "mongoose": "^6.0.13"
   },
   "name": "expressjs-masterclass-demo",
   "description": "Example of what the ExpressJS masterclass server for Flex1 2021 can look like.",

@@ -1,6 +1,8 @@
 # expressjs-masterclass-demo
  Example of what the ExpressJS masterclass server for Flex1 2021 can look like.
 
+ NOTE: This is big multi-lesson script. It will be a confusing, text-heavy mess unless you've got the lesson recordings to watch while going through these notes.
+
 ## Hello World
 
 Initialize your repo as an NPM project with this:
@@ -515,13 +517,315 @@ module.exports = routes;
 
 ```
 
-Commit and push your work again to see how things work on the live deployed app. Remember to use Postman to test out non-GET routes!
+Commit and push your work again to see how things work on the live deployed app. Note that your keys may not be secure just yet - we'll cover proper environment variable usage after the MongoDB section.
+
+And remember to use Postman or another network request tool to test out non-GET routes!
 
 
 ## MongoDB
 
-TODO!
+Make sure you have MongoDB installed and can access its shell! (Its shell is accessed via the `mongosh` command.)
 
+WSL users, refer to this page: [https://docs.microsoft.com/en-gb/windows/wsl/tutorials/wsl-database#install-mongodb](https://docs.microsoft.com/en-gb/windows/wsl/tutorials/wsl-database#install-mongodb)
+
+
+Make a `database.js` file in the project `src` directory (or equivalent space right next to your `index.js` file). Put this code in it:
+
+```js
+const mongoose = require('mongoose');
+
+
+async function databaseConnector(databaseURL){
+    await mongoose.connect(databaseURL);
+}
+
+module.exports = {
+    databaseConnector
+}
+```
+
+As you can see, it requires something called "mongoose" - it's a handler for MongoDB connections that uses slightly different syntax than the standard MongoDB NodeJS Driver. Install Mongoose with:
+
+`npm install mongoose --save`
+
+This function in this separate file helps us keep database configuration in a simpler space. However, we will still be using it in our `index.js` file. Add this in your `index.js` file somewhere before the routes:
+
+```js
+// Import the database connection function
+const { databaseConnector } = require('./database');
+// Establish what the database URL is going to be
+const DATABASE_URI = process.env.DATABASE_URI || 'mongodb://localhost:27017/yourappname';
+// Connect to the database using the URL
+databaseConnector(DATABASE_URI).then(() => {
+    console.log("Database connected successfully!");
+}).catch(error => {
+    console.log(`
+    Some error occured connecting to the database! It was: 
+    ${error}
+    `)
+});
+
+
+```
+
+You may notice that this is using another environment variable - we have to set up a production database on Heroku to make our deployed web server work properly! However, if no environment variable is provided, our database will just connect to a local MongoDB service with the database named "yourappname".
+
+We won't worry about deployment or production databases just yet, as we need to set up some stuff to properly handle our database config data.
+
+So, we're going to create a Schema. Yes, even in fluid & flexible Document Database Land, we will use some structure & order and put a Schema into our system. We need to know that there will be consistent data in these documents.
+
+Make a file named `PostSchema.js` in `src/database/schemas` -- yep, making two folders too. Your schema should look like this:
+
+```js
+const mongoose = require('mongoose');
+
+const PostSchema = new mongoose.Schema({
+    postTitle: String,
+    postContent: String,
+    postAuthorID: String
+})
+
+PostSchema.methods.getAuthorName = async function getAuthorName(){
+    console.log(`Use your auth system to search for a user with ID of ${this.postAuthorID} and get their username/displayname.`)
+}
+
+
+// Make sure this is last;
+// The ".model()" process bundles up all properties & methods written above into the model,
+// but it won't capture properties or methods written after ".model()" within this file.
+const Post = mongoose.model('Post', PostSchema);
+
+module.exports = {Post}
+
+```
+
+If you're curious about the types your schema can use for its properties, check out this link: [https://mongoosejs.com/docs/api/schema.html#schema_Schema.Types](https://mongoosejs.com/docs/api/schema.html#schema_Schema.Types) 
+Or this list:
+- String
+- Number
+- Boolean | Bool
+- Array
+- Buffer
+- Date
+- ObjectId | Oid
+- Mixed
+
+As you can see, we can create both a schema _and_ a model in the same file. This way, only the model is exposed to the rest of the app - any model setup is already done by the schema. 
+
+You will also see a placeholder function - that's a challenge for later, but basically you can use a model method that will perform other actions with a document's own data. Like a class instance method! So a document could call "getAuthorName()" and fire off a request to the Firebase Auth system to retrieve a username, even though the document only contains the user ID. Wouldn't that be cool?
+
+Now, a cool thing about Mongoose is that it's a smart system. By simple requiring Mongoose at the start of the file, anything we do with that Mongoose instance is already applied to the overall Mongoose database system. 
+
+This means that the Post model that we just made is now part of the database - no additional connections or calls or configuration needed. We just said "mongoose.model()" and it knows to take a schema and turn it into a database model.
+
+From here, we're going to jump back to our `postFunctions.js` file within `src/posts/` and start writing some new functions.
+
+```js
+const {Post} = require('../database/schemas/PostSchema');
+
+// Model.find() with no conditions inside "find()" will return all documents of that Model
+async function getAllPosts(){
+    let allPosts = await Post.find();
+    return JSON.stringify(allPosts);
+}
+
+// The ".exec()" helps the query just run instead of saving it for re-use.
+async function getSpecificPost(postID){
+    let specificPostQuery = await Post.findById(postID).exec();
+    return specificPostQuery;
+}
+
+// New Post instance needs to be specifically saved for it to be stored in the database.
+async function createSpecificPost(postDetails){
+    let newPost = new Post({
+        postTitle: postDetails.postTitle,
+        postContent: postDetails.postContent,
+        postAuthorID: postDetails.postAuthorID
+    })
+    let creationResult = await newPost.save();
+    return creationResult;
+}
+
+// Theoretically, you could use this instead of "new Post({})" thanks to upsert.
+async function updateSpecificPost(postDetails){
+    let updateResult = await Post.findByIdAndUpdate(
+        {_id: postDetails.postID},
+        {
+            postTitle: postDetails.postTitle,
+            postContent: postDetails.postContent,
+            postAuthorID: postDetails.postAuthorID
+        },
+        { 
+            upsert: true, // upsert means it'll create document if it doesn't exist
+            new: true // return the new modified doc. if false, original is returned.
+        } 
+    );
+
+    return updateResult;
+}
+
+// Returns an empty object if all goes well.
+async function deleteSpecificPost(postID){
+    let deletionResult = await Post.deleteOne({ _id: postID});
+    return deletionResult;
+}
+
+module.exports = {
+    getAllPosts, getSpecificPost, createSpecificPost, updateSpecificPost, deleteSpecificPost
+}
+
+```
+
+
+A lot of functionality is inspired by what Mongoose provides in their querying functionality - have a look at [their queries documentation here](https://mongoosejs.com/docs/queries.html).
+
+Jumping into the `postRoutes` file within `src/posts/postRoutes.js`, we can start using those new functions that we just made.
+
+```js
+const express = require('express');
+const { getSpecificPost, getAllPosts, createSpecificPost, updateSpecificPost, deleteSpecificPost } = require('./postFunctions');
+
+// Create a bundle of routes. We'll export this out and then import it into src/index.js.
+const routes = express.Router();
+
+// This is the "root" route for the Router instance. 
+// Its actual name in the URL will depend on how it's configured in src/index.js
+routes.get('/', async (request, response) => {
+
+    let queryResult = await getAllPosts();
+    response.json(queryResult);
+    //response.json(`Received a request on ${request.originalUrl}`);
+});
+
+// Set up route params with the colon before the name.
+routes.get('/:postID', async (request, response) => {
+
+    let queryResult = await getSpecificPost(request.params.postID);
+    response.json(queryResult)
+    // response.json(`Received a GET request for a post with ID of ${request.params.postID}`);
+
+});
+
+routes.put('/:postID', async (request, response) => {
+
+    let updateResult = await updateSpecificPost({
+        postID: request.params.postID,
+        postTitle: request.body.postTitle,
+        postContent: request.body.postContent,
+        postAuthorID: request.body.postAuthorID
+    })
+
+    response.json(updateResult);
+});
+
+routes.delete('/:postID', async (request, response) => {
+    let deleteResult = deleteSpecificPost(request.params.postID);
+    response.json(deleteResult);
+
+});
+
+// Use Postman or another HTTP tool to visit a POST route.
+routes.post('/', async (request, response) => {
+    
+    let creationResult = await createSpecificPost({
+        postTitle: request.body.postTitle,
+        postContent: request.body.postContent,
+        postAuthorID: request.body.postAuthorID
+    })
+
+    response.json(creationResult);
+    
+    // Cleanly build a response OBJ
+    // let jsonResponse = {
+    //     message:`Received a POST request for a post with ID of ${request.params.postID}`,
+    //     receivedBody: request.body
+    // }
+
+    // response.json(jsonResponse);
+});
+
+module.exports = routes;
+
+```
+
+Try it out locally with Postman! You may have to copy the post ID from a response into specific requests, such as making a post & copying its ID to use in find/update/delete requests.
+
+In `mongosh` (the MongoDB shell), you should be able to find your database and see its raw data. Run the command `show dbs` to see all available databases on your machine.
+
+Then, run `use yourappname` (replacing yourappname with your database name) to start working with your server's database.
+
+Then, you should be able to run commands like `db.posts.find()` to see all documents. You can check out [the MongoDB docs for more commands](https://docs.mongodb.com/manual/crud/) - just remember that MongoDB commands aren't always the same as Mongoose functions!
+
+## Deployment with proper key & credential management
+
+To properly handle our Firebase Auth and MongoDB keys, we need to actually put all relevant data into environment variables. We'll also have to set up a MongoDB Cloud Atlas database for a production database.
+
+For that `clientConfigData.js` file, we need to convert that into actual JSON using a website like this: [https://www.convertonline.io/convert/js-to-json](https://www.convertonline.io/convert/js-to-json)
+
+In Heroku, go to your app's settings and set a config var named "firebaseClientConfig" to that whole JSON.
+
+Similarly, set a config var named "firebaseAdminConfig" to the service account JSON file that you should also have been using so far.
+
+Your config vars should look like this so far (actual key data cropped out of the screenshot):
+
+![](./DocumentationAssets/HerokuConfigVars.png)
+
+In your code, you should update these snippets to pull from those new config vars if they are present:
+
+The client config:
+
+```js
+// src/users/userFunctions.js
+
+firebaseClient.initializeApp(process.env.firebaseClientConfig || firebaseClientConfig);
+
+```
+
+The admin config:
+
+```js
+// src/index.js
+firebaseAdmin.initializeApp({
+    credential: firebaseAdmin.credential.cert(process.env.firebaseAdminConfig || serviceAccount),
+});
+
+```
+
+Now, our database was already configured to use a config or environment variable if it was present, we just haven't used that yet. So as long as this is in your `src/index.js`, that's the last time we need to edit our code:
+
+```js
+// src/index.js
+
+const DATABASE_URI = process.env.DATABASE_URI || 'mongodb://localhost:27017/yourappname';
+
+
+```
+
+Now, we have to go to MongoDB. Our goal is to make a MongoDB Cloud Atlas database - it's all free, so make an account & jump in! Choose the "Shared" cluster or database option wherever it pops up, otherwise you should be able to stick to the default settings.
+
+Whatever username & password you set (and set that, not some certificate or other DB auth method), remember it. We need that in our database connection URL!
+
+Once your database is made & ready to use in the MongoDB dashboard, we need to find out what its connection URL actually is. Go to the "Command Line Tools" section of your database:
+
+![](./DocumentationAssets/MongoDBCLIToolsButton.png)
+
+From the page that the button takes you to, you should be able to see a heading in the center of the page that says "Connect To Your Cluster" - click on its "Connect Instructions" button. Then, click on "Connect your application" - you should see a page like this:
+
+![](./DocumentationAssets/MongoDBConnectURI.png)
+
+The thing that we want is the connection string that looks like this:
+
+`mongodb+srv://DatabaseUsername:DatabasePassword@ClusterName.tntdl.mongodb.net/DatabaseNameInMongoSH?retryWrites=true&w=majority`
+
+Depending on your database settings, your string should be unique to you. And of course, it requires the username and password that you set when creating your database.
+
+You want to put that string into Heroku as another config var, but make sure that it contains the right username & password!
+
+You should have a config var like this:
+
+![](./DocumentationAssets/HerokuMongoDBConnection.png)
+
+Since this string is only known to your deployed app, your local app won't ever be modifying any production database data. 
 
 ## ExpressJS as Micro-Services
 
