@@ -12,8 +12,12 @@ app.use(express.urlencoded({extended:true}));
 
 const firebaseAdmin = require('firebase-admin');
 const serviceAccount = require('../keys/alexhexpressdemo-firebase-adminsdk-ihj1f-5a0a4272fb.json');
+const serviceAccountEnv = JSON.parse(process.env.firebaseAdminConfig);
+if (serviceAccountEnv){
+    console.log(`Service Account ENV found! It is \n${serviceAccountEnv}`)
+}
 firebaseAdmin.initializeApp({
-    credential: firebaseAdmin.credential.cert(process.env.firebaseAdminConfig || serviceAccount),
+    credential: firebaseAdmin.credential.cert(serviceAccountEnv || serviceAccount),
 });
 
 // Import the database connection function
