@@ -762,22 +762,22 @@ To properly handle our Firebase Auth and MongoDB keys, we need to actually put a
 
 For that `clientConfigData.js` file, we need to convert that into actual JSON using a website like this: [https://www.convertonline.io/convert/js-to-json](https://www.convertonline.io/convert/js-to-json)
 
-In Heroku, go to your app's settings and set a config var named "firebaseClientConfig" to that whole JSON.
+In Heroku, go to your app's settings and set a config var named "FIREBASE_CLIENT_CONFIG" to that whole JSON string, so that your Firebase Client SDK is set.
 
-Similarly, set a config var named "firebaseAdminConfig" to the service account JSON file that you should also have been using so far.
+Similarly, set a config var named "GOOGLE_APPLICATION_CREDENTIALS" to the contents of the service account JSON file that you should also have been using so far (for the Firebase Admin SDK).
 
 Your config vars should look like this so far (actual key data cropped out of the screenshot):
 
 ![](./DocumentationAssets/HerokuConfigVars.png)
 
-In your code, you should update these snippets to pull from those new config vars if they are present:
+In your code, you should update these snippets to pull from those new config vars:
 
 The client config:
 
 ```js
 // src/users/userFunctions.js
 
-firebaseClient.initializeApp(process.env.firebaseClientConfig || firebaseClientConfig);
+firebaseClient.initializeApp(JSON.parse(process.env.FIREBASE_CLIENT_CONFIG));
 
 ```
 
@@ -785,11 +785,14 @@ The admin config:
 
 ```js
 // src/index.js
-firebaseAdmin.initializeApp({
-    credential: firebaseAdmin.credential.cert(process.env.firebaseAdminConfig || serviceAccount),
-});
+// Initialize the Firebase Admin SDK
+const firebaseAdmin = require('firebase-admin');
+firebaseAdmin.initializeApp({credential: firebaseAdmin.credential.applicationDefault()});
+
 
 ```
+
+Because `GOOGLE_APPLICATION_CREDENTIALS` is a special Firebase keyword, it'll load up the JSON without wrecking any private key formatting (trust me, it's an issue).
 
 Now, our database was already configured to use a config or environment variable if it was present, we just haven't used that yet. So as long as this is in your `src/index.js`, that's the last time we need to edit our code:
 
@@ -800,6 +803,35 @@ const DATABASE_URI = process.env.DATABASE_URI || 'mongodb://localhost:27017/your
 
 
 ```
+
+Another hurdle, however, is that the way we've coded up our environment variables isn't very local-friendly. So to use the same code in different environments, we need to setup something called `dotenv` -- a package that helps emulate environment variables within a repository.
+
+Install dotenv with this: `npm install dotenv`
+
+Add it to your `index.js` file, at the very top of the file before any other code:
+
+```js
+
+// Helps emulate environment or config vars by autodetecting ".env" files and using their data.
+// Any code before it won't have access to emulated environment variables.
+require('dotenv').config()
+
+
+```
+
+Create a `.env` file in the root of your repository - no, not your `src` folder, but the repository folder itself. Give it these two keys:
+
+```
+GOOGLE_APPLICATION_CREDENTIALS=./keys/firebaseAdminServiceAccount.json
+
+FIREBASE_CLIENT_CONFIG=
+```
+
+The `GOOGLE_APPLICATION_CREDENTIALS` key can point to the JSON file that contains your Firebase Admin SDK credentials.
+
+The `FIREBASE_CLIENT_CONFIG` key should be the JSON that your Firebase Client SDK credentials were converted into.
+
+
 
 Now, we have to go to MongoDB. Our goal is to make a MongoDB Cloud Atlas database - it's all free, so make an account & jump in! Choose the "Shared" cluster or database option wherever it pops up, otherwise you should be able to stick to the default settings.
 

@@ -1,3 +1,7 @@
+// Helps emulate environment or config vars by autodetecting ".env" files and using their data.
+require('dotenv').config()
+
+
 const express = require('express');
 // Initialize Express as an instance named "app".
 const app = express();
@@ -10,15 +14,11 @@ const HOST = '0.0.0.0';
 app.use(express.json());
 app.use(express.urlencoded({extended:true}));
 
+// Initialize the Firebase Admin SDK
 const firebaseAdmin = require('firebase-admin');
-const serviceAccount = require('../keys/alexhexpressdemo-firebase-adminsdk-ihj1f-5a0a4272fb.json');
-const serviceAccountEnv = JSON.parse(process.env.firebaseAdminConfig);
-if (serviceAccountEnv){
-    console.log(`Service Account ENV found! It is \n${serviceAccountEnv}`)
-}
-firebaseAdmin.initializeApp({
-    credential: firebaseAdmin.credential.cert(serviceAccountEnv || serviceAccount),
-});
+firebaseAdmin.initializeApp({credential: firebaseAdmin.credential.applicationDefault()});
+
+
 
 // Import the database connection function
 const { databaseConnector } = require('./database');
