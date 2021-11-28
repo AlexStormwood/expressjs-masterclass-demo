@@ -16,8 +16,7 @@ app.use(express.urlencoded({extended:true}));
 
 // Initialize the Firebase Admin SDK
 const firebaseAdmin = require('firebase-admin');
-firebaseAdmin.initializeApp({credential: firebaseAdmin.credential.applicationDefault()});
-
+firebaseAdmin.initializeApp({credential: firebaseAdmin.credential.cert(JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS))})
 
 
 // Import the database connection function

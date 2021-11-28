@@ -762,6 +762,8 @@ To properly handle our Firebase Auth and MongoDB keys, we need to actually put a
 
 For that `clientConfigData.js` file, we need to convert that into actual JSON using a website like this: [https://www.convertonline.io/convert/js-to-json](https://www.convertonline.io/convert/js-to-json)
 
+You may also want to run your JSON strings through this to remove line breaks: [https://www.textfixer.com/tools/remove-line-breaks.php](https://www.textfixer.com/tools/remove-line-breaks.php)
+
 In Heroku, go to your app's settings and set a config var named "FIREBASE_CLIENT_CONFIG" to that whole JSON string, so that your Firebase Client SDK is set.
 
 Similarly, set a config var named "GOOGLE_APPLICATION_CREDENTIALS" to the contents of the service account JSON file that you should also have been using so far (for the Firebase Admin SDK).
@@ -787,7 +789,7 @@ The admin config:
 // src/index.js
 // Initialize the Firebase Admin SDK
 const firebaseAdmin = require('firebase-admin');
-firebaseAdmin.initializeApp({credential: firebaseAdmin.credential.applicationDefault()});
+firebaseAdmin.initializeApp({credential: firebaseAdmin.credential.cert(JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS))})
 
 
 ```
@@ -822,14 +824,14 @@ require('dotenv').config()
 Create a `.env` file in the root of your repository - no, not your `src` folder, but the repository folder itself. Give it these two keys:
 
 ```
-GOOGLE_APPLICATION_CREDENTIALS=./keys/firebaseAdminServiceAccount.json
+GOOGLE_APPLICATION_CREDENTIALS=
 
 FIREBASE_CLIENT_CONFIG=
 ```
 
-The `GOOGLE_APPLICATION_CREDENTIALS` key can point to the JSON file that contains your Firebase Admin SDK credentials.
+The `GOOGLE_APPLICATION_CREDENTIALS` key should be the JSON string that is your Firebase Admin SDK credentials.
 
-The `FIREBASE_CLIENT_CONFIG` key should be the JSON that your Firebase Client SDK credentials were converted into.
+The `FIREBASE_CLIENT_CONFIG` key should be the JSON string that is your Firebase Client SDK credentials.
 
 
 
